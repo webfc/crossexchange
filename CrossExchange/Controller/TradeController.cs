@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using CrossExchange.Interface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,15 +13,19 @@ namespace CrossExchange.Controller
     [Route("api/Trade")]
     public class TradeController : ControllerBase
     {
-        private IShareRepository _shareRepository { get; set; }
-        private ITradeRepository _tradeRepository { get; set; }
-        private IPortfolioRepository _portfolioRepository { get; set; }
+        private ITradesService _tradesServices;
+        private ITradeRepository _tradeRepository;
+        private IPortfolioService _portfolioService;
+        private ISharesService _sharesService; 
 
-        public TradeController(IShareRepository shareRepository, ITradeRepository tradeRepository, IPortfolioRepository portfolioRepository)
+
+        public TradeController(ITradesService TradesService, ISharesService SharesService, ITradeRepository TradeRepository, IPortfolioService PortfolioService)
         {
-            _shareRepository = shareRepository;
-            _tradeRepository = tradeRepository;
-            _portfolioRepository = portfolioRepository;
+
+            _tradesServices = TradesService;
+            _tradeRepository = TradeRepository;
+            _portfolioService = PortfolioService;
+            _sharesService = SharesService; 
         }
 
 
@@ -30,7 +35,6 @@ namespace CrossExchange.Controller
             var trade = _tradeRepository.Query().Where(x => x.PortfolioId.Equals(portFolioid));
             return Ok(trade);
         }
-
 
 
         /*************************************************************************************************************************************
@@ -49,11 +53,101 @@ namespace CrossExchange.Controller
 
         *************************************************************************************************************************************/
 
+        public vmTrade TradeModelIsValid(TradeModel trade)
+        {
+
+            try
+            {
+                //get the portfolio info
+                Portfolio portfolio = _portfolioService.GetPortfolio(trade.PortfolioId);
+
+                if (portfolio == null)
+                {
+
+                    throw new Exception("Invalid solicitation, portfolio not exists!");
+                }
+
+                //get the share
+                HourlyShareRate share = _sharesService.GetShare(trade.Symbol);
+                if (share == null)
+                {
+                    throw new Exception("Invalid solicitation, share not exists!");
+
+                }
+
+                //given a object with portfolio and share infos
+                vmTrade r = new vmTrade()
+                {
+
+                    Share = share,
+                    Portfolio = portfolio
+                };
+
+                return r;
+
+
+            }
+            catch (Exception ex)
+            {
+
+                throw new Exception(ex.Message);
+            }
+
+
+        }
+
+
+        /*
+          This action performe a general trades
+        */
         [HttpPost]
         public async Task<IActionResult> Post([FromBody]TradeModel model)
         {
-            return Created("Trade", model);
+            try
+            {
+
+                //verify if trademodel is valid
+                var _Trade = TradeModelIsValid(model);
+                Trade nTrade = new Trade(); 
+
+
+            //based on the action off trade execute the operation
+            if(model.Action == "BUY")
+            {
+                    nTrade = await _tradesServices.Add(model, _Trade.Share);
+            }
+            if(model.Action == "SELL")
+            {
+
+                //reazon between shares bought and sold to this particular share
+                var availableShares = _sharesService.AvailableShares(_Trade.Share, _Trade.Portfolio.Id); 
+                if(availableShares > model.NoOfShares)
+                {
+
+                        nTrade = await _tradesServices.Add(model, _Trade.Share);
+                }else
+                    {
+
+                        throw new Exception(string.Format("Invalid solicitation, this portfolio has only {0} available shares", availableShares));
+                    }
+            }
+
+                return Ok(nTrade);
+
+
+            }
+            catch(Exception ex)
+            {
+
+                return BadRequest(ex.Message); 
+            }
         }
+       
         
+        public class vmTrade
+        {
+            public Portfolio Portfolio { get; set; }
+            public HourlyShareRate Share { get; set; }
+        }
     }
 }

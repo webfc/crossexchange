@@ -14,6 +14,7 @@ namespace CrossExchange
             return await _dbContext.FindAsync<T>(id);
         }
 
+
         public IQueryable<T> Query()
         {
             return _dbContext.Set<T>().AsQueryable();

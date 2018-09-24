@@ -1,3 +1,5 @@
+using CrossExchange.Interface;
+using CrossExchange.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +25,9 @@ namespace CrossExchange
             services.AddTransient<IShareRepository, ShareRepository>();
             services.AddTransient<IPortfolioRepository, PortfolioRepository>();
             services.AddTransient<ITradeRepository, TradeRepository>();
+            services.AddScoped<ITradesService, TradesService>();
+            services.AddScoped<IPortfolioService, PortfolioService>();
+            services.AddScoped<ISharesService, SharesService>(); 
             services.AddMvc();
         }
 
